@@ -1,6 +1,7 @@
 package main
 
 import (
+	"unicode"
 	"flag"
 	"io"
 	"os"
@@ -11,20 +12,14 @@ const ()
 
 type MRWordCount struct{}
 
+func isPunctOrSpace(r rune) bool {
+	return unicode.IsPunct(r) || unicode.IsSpace(r)
+}
+
 func (j *MRWordCount) Map(line interface{}, out chan Pair) error {
-	STOP_TOKENS := []string{
-		`'`, `"`, `,`,
-		`\n`, `\t`,
-		`;`, `:`, `,`, `.`, `?`,
-		`(`, `)`, `]`, `[`, `|`,
-	}
-	for _, word := range strings.Fields(line.(string)) {
-		word = strings.TrimSpace(strings.ToLower(word))
-		for _, t := range STOP_TOKENS {
-			word = strings.Replace(word, t, "", -1)
-		}
+	for _, word := range strings.FieldsFunc(line.(string), isPunctOrSpace) {
 		if len(word) > 0 {
-			out <- Pair{word, 1}
+			out <- Pair{strings.ToLower(word), 1}
 		}
 	}
 	return nil
