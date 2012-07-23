@@ -2,11 +2,14 @@ package main
 
 import (
 	"bufio"
-	"io"
-	// "fmt"
-	"strings"
 	"encoding/json"
+	"fmt"
+	"io"
+	"strings"
+	// "encoding/csv"
 )
+
+var _ fmt.Scanner
 
 type Pair struct {
 	K, V interface{}
@@ -27,36 +30,33 @@ type MRJob struct {
 
 func NewMRJob(m Mapper, r Reducer) *MRJob {
 
-	return &MRJob{m, r}	
+	return &MRJob{m, r}
 }
 
 type JSONPairWriter struct {
-	w *bufio.Writer
+	w *bufio.Writer //*csv.Writer
 }
 
 func NewPairWriter(w io.Writer) *JSONPairWriter {
+	// csvW := csv.NewWriter(w)
+	// csvW.Comma = '\t'
 	return &JSONPairWriter{bufio.NewWriter(w)}
 }
 
 func (w *JSONPairWriter) Write(p Pair) (err error) {
-	b, err := json.Marshal(p.K)
+	key, err := json.Marshal(p.K)
 	if err != nil {
 		return err
 	}
-	w.w.Write(b)
-	_, err = w.w.WriteString("\t")
+	val, err := json.Marshal(p.V)
 	if err != nil {
 		return err
 	}
-	b, err = json.Marshal(p.V)
+	_, err = w.w.WriteString(strings.Join([]string{string(key), string(val)}, "\t"))
+	w.w.WriteByte('\n')
 	if err != nil {
 		return err
 	}
-	_, err = w.w.Write(b)
-	if err != nil {
-		return err
-	}
-	w.w.WriteString("\n")
 	return nil
 }
 
@@ -64,28 +64,33 @@ type JSONPairReader struct {
 	r *bufio.Reader
 }
 
-func NewPairReader(w io.Reader) *JSONPairReader {
-	return &JSONPairReader{bufio.NewReader(w)}	
+func NewPairReader(r io.Reader) *JSONPairReader {
+	return &JSONPairReader{bufio.NewReader(r)}
 }
 
 func (r *JSONPairReader) Read() (*Pair, error) {
-	line, err := r.r.ReadString("\n")	
+	line, err := r.r.ReadString('\n')
 	if err != nil {
-		return err
+		return nil, err
 	}
+	fields := strings.SplitN(line, "\t", 2)
 
-	fields := strings.SplitN(line, "\t", 1)
+	// fmt.Println("fields:", fields)
 	var key interface{}
 	var val interface{}
-	err := json.Unmarshal(fields[0], key)
+	err = json.Unmarshal([]byte(strings.TrimSpace(fields[0])), &key)
 	if err != nil {
-		return err
+		fmt.Println("fields:", fields[0])
+		panic(err)
+		return nil, err
 	}
-	err := json.Unmarshal(fields[1], val)
+	err = json.Unmarshal([]byte(strings.TrimSpace(fields[1])), &val)
 	if err != nil {
-		return err
+		panic(err)
+		return nil, err
 	}
-	return &Pair{key, val}
+	// fmt.Println("key:", key)
+	return &Pair{key, val}, nil
 }
 
 func (j *MRJob) runMapper(in io.Reader, out io.Writer) (err error) {
@@ -114,32 +119,33 @@ func (j *MRJob) runMapper(in io.Reader, out io.Writer) (err error) {
 }
 
 func (j *MRJob) runReducer(in io.Reader, out io.Writer) error {
-	bufIn := bufio.NewReader(in)
+	pairIn := NewPairReader(in)
 	pairOut := NewPairWriter(out)
 	reducerOut := make(chan Pair)
 
 	go func() {
 		for p := range reducerOut {
 			err := pairOut.Write(p)
-			if err != nil {
-				panic(err)
+			if err != nil && err == io.EOF {
+				return
 			}
 		}
 	}()
 
-	var lastKey interface{}
+	var lastKey string
 	var valChan chan interface{}
 
 	for {
-		line, err := bufIn.ReadString('\n')
+		p, err := pairIn.Read()
 		if err != nil {
 			return err
 		}
-		p := NewPair(line)
-		if lastKey == p.K {
+		thisKey, _ := json.Marshal(p.K)
+		if lastKey == string(thisKey) {
 			valChan <- p.V
 		} else {
-			lastKey = p.K
+			lastKeyBytes, _ := json.Marshal(p.K)
+			lastKey = string(lastKeyBytes)
 			if valChan != nil {
 				close(valChan)
 			}
