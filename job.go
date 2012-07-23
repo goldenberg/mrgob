@@ -12,15 +12,6 @@ type Pair struct {
 	K, V interface{}
 }
 
-func NewPair(s string) *Pair {
-	fields := strings.SplitN(s, "\t", 1)
-	var k  string
-	var v  int
-	json.Unmarshal([]byte(fields[0]), k)
-	json.Unmarshal([]byte(fields[1]), v)
-	return &Pair{k, v}
-}
-
 type Mapper interface {
 	Map(x interface{}, out chan Pair) error
 }
@@ -67,6 +58,34 @@ func (w *JSONPairWriter) Write(p Pair) (err error) {
 	}
 	w.w.WriteString("\n")
 	return nil
+}
+
+type JSONPairReader struct {
+	r *bufio.Reader
+}
+
+func NewPairReader(w io.Reader) *JSONPairReader {
+	return &JSONPairReader{bufio.NewReader(w)}	
+}
+
+func (r *JSONPairReader) Read() (*Pair, error) {
+	line, err := r.r.ReadString("\n")	
+	if err != nil {
+		return err
+	}
+
+	fields := strings.SplitN(line, "\t", 1)
+	var key interface{}
+	var val interface{}
+	err := json.Unmarshal(fields[0], key)
+	if err != nil {
+		return err
+	}
+	err := json.Unmarshal(fields[1], val)
+	if err != nil {
+		return err
+	}
+	return &Pair{key, val}
 }
 
 func (j *MRJob) runMapper(in io.Reader, out io.Writer) (err error) {
