@@ -15,9 +15,9 @@ func (j *MRWordCount) Map(line interface{}, out chan Pair) error {
 	STOP_TOKENS := []string{
 		`'`, `"`, `,`,
 		`\n`, `\t`,
-		`;`, `,`, `.`,
-		`(`, `)`, `:`,
-		`]`, `[`}
+		`;`, `:`, `,`, `.`, `?`,
+		`(`, `)`, `]`, `[`, `|`,
+	}
 	for _, word := range strings.Fields(line.(string)) {
 		word = strings.TrimSpace(strings.ToLower(word))
 		for _, t := range STOP_TOKENS {
@@ -33,10 +33,6 @@ func (j *MRWordCount) Map(line interface{}, out chan Pair) error {
 func (j *MRWordCount) Reduce(key interface{}, values chan interface{}, out chan Pair) error {
 	sum := 0.
 	for val := range values {
-		// i, err := strconv.Atoi(val.(string))
-		// if err != nil {
-		// 	return err
-		// }
 		sum += val.(float64)
 	}
 	out <- Pair{key.(string), sum}

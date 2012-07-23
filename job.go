@@ -80,8 +80,6 @@ func (r *JSONPairReader) Read() (*Pair, error) {
 	var val interface{}
 	err = json.Unmarshal([]byte(strings.TrimSpace(fields[0])), &key)
 	if err != nil {
-		fmt.Println("fields:", fields[0])
-		panic(err)
 		return nil, err
 	}
 	err = json.Unmarshal([]byte(strings.TrimSpace(fields[1])), &val)
@@ -138,7 +136,12 @@ func (j *MRJob) runReducer(in io.Reader, out io.Writer) error {
 	for {
 		p, err := pairIn.Read()
 		if err != nil {
-			return err
+			if err == io.EOF {
+				return err
+			} else {
+				fmt.Errorf("Bad line: %v", err)
+				continue
+			}
 		}
 		thisKey, _ := json.Marshal(p.K)
 		if lastKey == string(thisKey) {
