@@ -9,7 +9,7 @@ import (
 )
 
 type JSONPairWriter struct {
-	w *bufio.Writer
+	*bufio.Writer
 }
 
 func NewPairWriter(w io.Writer) *JSONPairWriter {
@@ -25,20 +25,16 @@ func (w *JSONPairWriter) Write(p Pair) (err error) {
 	if err != nil {
 		return err
 	}
-	_, err = w.w.WriteString(strings.Join([]string{string(key), string(val)}, "\t"))
-	w.w.WriteByte('\n')
+	_, err = w.WriteString(strings.Join([]string{string(key), string(val)}, "\t"))
+	w.WriteByte('\n')
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (w *JSONPairWriter) Flush() {
-	w.w.Flush()
-}
-
 type JSONPairReader struct {
-	r *bufio.Reader
+	*bufio.Reader
 }
 
 func NewPairReader(r io.Reader) *JSONPairReader {
@@ -46,13 +42,12 @@ func NewPairReader(r io.Reader) *JSONPairReader {
 }
 
 func (r *JSONPairReader) Read() (*Pair, error) {
-	line, err := r.r.ReadString('\n')
+	line, err := r.ReadString('\n')
 	if err != nil {
 		return nil, err
 	}
 	fields := strings.SplitN(line, "\t", 2)
 
-	// fmt.Println("fields:", fields)
 	var key interface{}
 	var val interface{}
 	err = json.Unmarshal([]byte(strings.TrimSpace(fields[0])), &key)
@@ -65,6 +60,5 @@ func (r *JSONPairReader) Read() (*Pair, error) {
 		fmt.Println("bad val", val, "on line", line)
 		return nil, err
 	}
-	// fmt.Println("key:", key)
 	return &Pair{key, val}, nil
 }
