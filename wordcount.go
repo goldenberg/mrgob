@@ -39,7 +39,7 @@ func main() {
 	var runReducer = flag.Bool("reducer", false, "Run the mapper")
 	flag.Parse()
 	j := new(MRWordCount)
-	job := NewMRJob(j, j)
+	job := NewRunner(j, j)
 	if *runMapper {
 		job.runMapper(os.Stdin, os.Stdout)
 	} else if *runReducer {

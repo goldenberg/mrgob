@@ -23,14 +23,14 @@ type Reducer interface {
 	Reduce(key interface{}, values chan interface{}, out chan Pair) error
 }
 
-type MRJob struct {
+type Runner struct {
 	mapper  Mapper
 	reducer Reducer
 }
 
-func NewMRJob(m Mapper, r Reducer) *MRJob {
+func NewRunner(m Mapper, r Reducer) *Runner {
 
-	return &MRJob{m, r}
+	return &Runner{m, r}
 }
 
 type JSONPairWriter struct {
@@ -91,7 +91,7 @@ func (r *JSONPairReader) Read() (*Pair, error) {
 	return &Pair{key, val}, nil
 }
 
-func (j *MRJob) runMapper(in io.Reader, out io.Writer) (err error) {
+func (j *Runner) runMapper(in io.Reader, out io.Writer) (err error) {
 	bufIn := bufio.NewReader(in)
 	pairOut := NewPairWriter(out)
 	mapperOut := make(chan Pair)
@@ -116,7 +116,7 @@ func (j *MRJob) runMapper(in io.Reader, out io.Writer) (err error) {
 	return nil
 }
 
-func (j *MRJob) runReducer(in io.Reader, out io.Writer) error {
+func (j *Runner) runReducer(in io.Reader, out io.Writer) error {
 	pairIn := NewPairReader(in)
 	pairOut := NewPairWriter(out)
 	reducerOut := make(chan Pair)
