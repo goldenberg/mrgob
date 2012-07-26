@@ -146,7 +146,8 @@ func (j *Runner) runReducer(in io.Reader, out io.Writer) error {
 		}
 	}()
 
-	curKey := "_"
+	// Keep track of the current key.
+	var curKey *string
 	vals := make([]interface{}, 0)
 
 	for {
@@ -154,27 +155,36 @@ func (j *Runner) runReducer(in io.Reader, out io.Writer) error {
 		if err != nil {
 			return err
 		}
-		if curKey == "_" {
-			curKey = p.K.(string)
+		if curKey == nil {
+			k := p.K.(string)
+			curKey = &k
 		}
-		if curKey == p.K.(string) {
+		// If we're on the same key, send it on
+		if *curKey == p.K.(string) {
 			vals = append(vals, p.V)
+
+		// If the key switched start reducing.
 		} else {
 			// Run the reducer synchronously
 			valChan := make(chan interface{})
 			go func() {
-				j.reducer.Reduce(curKey, valChan, reducerOut)
+				j.reducer.Reduce(*curKey, valChan, reducerOut)
 			}()
 			for _, v := range vals {
 				valChan <- v		
 			}
 			close(valChan)
 
-			curKey = p.K.(string)
+			k := p.K.(string)
+			curKey = &k
 			vals = make([]interface{}, 0)
 			vals = append(vals, p.V)
 		}
 	}
 	close(reducerOut)
 	return nil
+}
+
+func (r *Runner) Run() {
+	
 }
