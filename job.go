@@ -2,11 +2,10 @@ package main
 
 import (
 	"bufio"
-	"encoding/json"
 	"fmt"
 	"io"
-	"strings"
-	// "encoding/csv"
+	"flag"
+	"os"
 )
 
 var _ fmt.Scanner
@@ -29,72 +28,10 @@ type Runner struct {
 }
 
 func NewRunner(m Mapper, r Reducer) *Runner {
-
 	return &Runner{m, r}
 }
 
-type JSONPairWriter struct {
-	w *bufio.Writer 
-}
 
-func NewPairWriter(w io.Writer) *JSONPairWriter {
-	return &JSONPairWriter{bufio.NewWriter(w)}
-}
-
-func (w *JSONPairWriter) Write(p Pair) (err error) {
-	key, err := json.Marshal(p.K)
-	if err != nil {
-		return err
-	}
-	val, err := json.Marshal(p.V)
-	if err != nil {
-		return err
-	}
-	_, err = w.w.WriteString(strings.Join([]string{string(key), string(val)}, "\t"))
-	w.w.WriteByte('\n')
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (w *JSONPairWriter) Flush() {
-	w.w.Flush()
-}
-
-
-
-type JSONPairReader struct {
-	r *bufio.Reader
-}
-
-func NewPairReader(r io.Reader) *JSONPairReader {
-	return &JSONPairReader{bufio.NewReader(r)}
-}
-
-func (r *JSONPairReader) Read() (*Pair, error) {
-	line, err := r.r.ReadString('\n')
-	if err != nil {
-		return nil, err
-	}
-	fields := strings.SplitN(line, "\t", 2)
-
-	// fmt.Println("fields:", fields)
-	var key interface{}
-	var val interface{}
-	err = json.Unmarshal([]byte(strings.TrimSpace(fields[0])), &key)
-	if err != nil {
-		fmt.Println("bad key", key, "on line", line)
-		return nil, err
-	}
-	err = json.Unmarshal([]byte(strings.TrimSpace(fields[1])), &val)
-	if err != nil {
-		fmt.Println("bad val", val, "on line", line)
-		return nil, err
-	}
-	// fmt.Println("key:", key)
-	return &Pair{key, val}, nil
-}
 
 func (j *Runner) runMapper(in io.Reader, out io.Writer) (err error) {
 	bufIn := bufio.NewReader(in)
@@ -134,6 +71,7 @@ func (j *Runner) runReducer(in io.Reader, out io.Writer) error {
 	pairIn := NewPairReader(in)
 	reducerOut := make(chan Pair)
 
+	// Write the output
 	go func() {
 		pairOut := NewPairWriter(out)
 		defer pairOut.Flush()
@@ -146,7 +84,7 @@ func (j *Runner) runReducer(in io.Reader, out io.Writer) error {
 		}
 	}()
 
-	// Keep track of the current key.
+	// Keep track of the current key, assumed to be a string...
 	var curKey *string
 	vals := make([]interface{}, 0)
 
@@ -186,5 +124,16 @@ func (j *Runner) runReducer(in io.Reader, out io.Writer) error {
 }
 
 func (r *Runner) Run() {
-	
+	var runMapper = flag.Bool("mapper", false, "Run the mapper")
+	var runReducer = flag.Bool("reducer", false, "Run the mapper")
+	flag.Parse()
+
+	if *runMapper {
+		r.runMapper(os.Stdin, os.Stdout)
+	} else if *runReducer {
+		err := r.runReducer(os.Stdin, os.Stdout)
+		if err != nil && err != io.EOF {
+			panic(err)
+		}
+	}	
 }

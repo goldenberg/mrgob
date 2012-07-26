@@ -2,9 +2,6 @@ package main
 
 import (
 	"unicode"
-	"flag"
-	"io"
-	"os"
 	"strings"
 )
 
@@ -35,17 +32,7 @@ func (j *MRWordCount) Reduce(key interface{}, values chan interface{}, out chan 
 }
 
 func main() {
-	var runMapper = flag.Bool("mapper", false, "Run the mapper")
-	var runReducer = flag.Bool("reducer", false, "Run the mapper")
-	flag.Parse()
-	j := new(MRWordCount)
-	runner := NewRunner(j, j)
-	if *runMapper {
-		runner.runMapper(os.Stdin, os.Stdout)
-	} else if *runReducer {
-		err := runner.runReducer(os.Stdin, os.Stdout)
-		if err != nil && err != io.EOF {
-			panic(err)
-		}
-	}
+	job := new(MRWordCount)
+	runner := NewRunner(job, job)
+	runner.Run()
 }
