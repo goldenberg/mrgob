@@ -17,11 +17,11 @@ func NewPairWriter(w io.Writer) *JSONPairWriter {
 }
 
 func (w *JSONPairWriter) Write(p Pair) (err error) {
-	key, err := json.Marshal(p.K)
+	key, err := json.Marshal(p.Key)
 	if err != nil {
 		return err
 	}
-	val, err := json.Marshal(p.V)
+	val, err := json.Marshal(p.Value)
 	if err != nil {
 		return err
 	}

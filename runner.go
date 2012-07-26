@@ -3,15 +3,12 @@ package main
 import (
 	"bufio"
 	"flag"
-	"fmt"
 	"io"
 	"os"
 )
 
-var _ fmt.Scanner
-
 type Pair struct {
-	K, V interface{}
+	Key, Value interface{}
 }
 
 type Mapper interface {
@@ -91,12 +88,12 @@ func (j *Runner) runReducer(in io.Reader, out io.Writer) error {
 			return err
 		}
 		if curKey == nil {
-			k := p.K.(string)
+			k := p.Key.(string)
 			curKey = &k
 		}
 		// If we're on the same key, send it on
-		if *curKey == p.K.(string) {
-			vals = append(vals, p.V)
+		if *curKey == p.Key.(string) {
+			vals = append(vals, p.Value)
 
 			// If the key switched start reducing.
 		} else {
@@ -110,10 +107,10 @@ func (j *Runner) runReducer(in io.Reader, out io.Writer) error {
 			}
 			close(valChan)
 
-			k := p.K.(string)
+			k := p.Key.(string)
 			curKey = &k
 			vals = make([]interface{}, 0)
-			vals = append(vals, p.V)
+			vals = append(vals, p.Value)
 		}
 	}
 	close(reducerOut)
