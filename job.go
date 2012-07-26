@@ -34,12 +34,10 @@ func NewRunner(m Mapper, r Reducer) *Runner {
 }
 
 type JSONPairWriter struct {
-	w *bufio.Writer //*csv.Writer
+	w *bufio.Writer 
 }
 
 func NewPairWriter(w io.Writer) *JSONPairWriter {
-	// csvW := csv.NewWriter(w)
-	// csvW.Comma = '\t'
 	return &JSONPairWriter{bufio.NewWriter(w)}
 }
 
@@ -59,6 +57,12 @@ func (w *JSONPairWriter) Write(p Pair) (err error) {
 	}
 	return nil
 }
+
+func (w *JSONPairWriter) Flush() {
+	w.w.Flush()
+}
+
+
 
 type JSONPairReader struct {
 	r *bufio.Reader
@@ -80,11 +84,12 @@ func (r *JSONPairReader) Read() (*Pair, error) {
 	var val interface{}
 	err = json.Unmarshal([]byte(strings.TrimSpace(fields[0])), &key)
 	if err != nil {
+		fmt.Println("bad key", key, "on line", line)
 		return nil, err
 	}
 	err = json.Unmarshal([]byte(strings.TrimSpace(fields[1])), &val)
 	if err != nil {
-		panic(err)
+		fmt.Println("bad val", val, "on line", line)
 		return nil, err
 	}
 	// fmt.Println("key:", key)
@@ -95,6 +100,9 @@ func (j *Runner) runMapper(in io.Reader, out io.Writer) (err error) {
 	bufIn := bufio.NewReader(in)
 	pairOut := NewPairWriter(out)
 	mapperOut := make(chan Pair)
+
+	defer pairOut.Flush()
+	defer close(mapperOut)
 
 	go func() {
 		for p := range mapperOut {
@@ -112,16 +120,24 @@ func (j *Runner) runMapper(in io.Reader, out io.Writer) (err error) {
 		}
 		j.mapper.Map(line, mapperOut)
 	}
-	close(mapperOut)
 	return nil
+}
+
+
+type ReduceTask struct {
+	key interface{}
+	vals chan interface{}	
+	reducer Reducer
 }
 
 func (j *Runner) runReducer(in io.Reader, out io.Writer) error {
 	pairIn := NewPairReader(in)
-	pairOut := NewPairWriter(out)
 	reducerOut := make(chan Pair)
 
 	go func() {
+		pairOut := NewPairWriter(out)
+		defer pairOut.Flush()
+
 		for p := range reducerOut {
 			err := pairOut.Write(p)
 			if err != nil && err == io.EOF {
@@ -130,35 +146,35 @@ func (j *Runner) runReducer(in io.Reader, out io.Writer) error {
 		}
 	}()
 
-	var lastKey string
-	var valChan chan interface{}
+	curKey := "_"
+	vals := make([]interface{}, 0)
 
 	for {
 		p, err := pairIn.Read()
 		if err != nil {
-			if err == io.EOF {
-				return err
-			} else {
-				fmt.Errorf("Bad line: %v", err)
-				continue
-			}
+			return err
 		}
-		thisKey, _ := json.Marshal(p.K)
-		if lastKey == string(thisKey) {
-			valChan <- p.V
+		if curKey == "_" {
+			curKey = p.K.(string)
+		}
+		if curKey == p.K.(string) {
+			vals = append(vals, p.V)
 		} else {
-			lastKeyBytes, _ := json.Marshal(p.K)
-			lastKey = string(lastKeyBytes)
-			if valChan != nil {
-				close(valChan)
-			}
-			valChan = make(chan interface{})
+			// Run the reducer synchronously
+			valChan := make(chan interface{})
 			go func() {
-				j.reducer.Reduce(lastKey, valChan, reducerOut)
+				j.reducer.Reduce(curKey, valChan, reducerOut)
 			}()
+			for _, v := range vals {
+				valChan <- v		
+			}
+			close(valChan)
+
+			curKey = p.K.(string)
+			vals = make([]interface{}, 0)
+			vals = append(vals, p.V)
 		}
 	}
-	close(valChan)
 	close(reducerOut)
 	return nil
 }
