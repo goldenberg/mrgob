@@ -2,9 +2,9 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
 	"io"
-	"flag"
 	"os"
 )
 
@@ -30,8 +30,6 @@ type Runner struct {
 func NewRunner(m Mapper, r Reducer) *Runner {
 	return &Runner{m, r}
 }
-
-
 
 func (j *Runner) runMapper(in io.Reader, out io.Writer) (err error) {
 	bufIn := bufio.NewReader(in)
@@ -60,10 +58,9 @@ func (j *Runner) runMapper(in io.Reader, out io.Writer) (err error) {
 	return nil
 }
 
-
 type ReduceTask struct {
-	key interface{}
-	vals chan interface{}	
+	key     interface{}
+	vals    chan interface{}
 	reducer Reducer
 }
 
@@ -101,7 +98,7 @@ func (j *Runner) runReducer(in io.Reader, out io.Writer) error {
 		if *curKey == p.K.(string) {
 			vals = append(vals, p.V)
 
-		// If the key switched start reducing.
+			// If the key switched start reducing.
 		} else {
 			// Run the reducer synchronously
 			valChan := make(chan interface{})
@@ -109,7 +106,7 @@ func (j *Runner) runReducer(in io.Reader, out io.Writer) error {
 				j.reducer.Reduce(*curKey, valChan, reducerOut)
 			}()
 			for _, v := range vals {
-				valChan <- v		
+				valChan <- v
 			}
 			close(valChan)
 
@@ -135,5 +132,5 @@ func (r *Runner) Run() {
 		if err != nil && err != io.EOF {
 			panic(err)
 		}
-	}	
+	}
 }

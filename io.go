@@ -1,15 +1,15 @@
 package main
 
 import (
-"io"
-"bufio"
-"encoding/json"
-"strings"
-"fmt"
+	"bufio"
+	"encoding/json"
+	"fmt"
+	"io"
+	"strings"
 )
 
 type JSONPairWriter struct {
-	w *bufio.Writer 
+	w *bufio.Writer
 }
 
 func NewPairWriter(w io.Writer) *JSONPairWriter {

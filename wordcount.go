@@ -1,8 +1,8 @@
 package main
 
 import (
-	"unicode"
 	"strings"
+	"unicode"
 )
 
 const ()
