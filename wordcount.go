@@ -39,11 +39,11 @@ func main() {
 	var runReducer = flag.Bool("reducer", false, "Run the mapper")
 	flag.Parse()
 	j := new(MRWordCount)
-	job := NewRunner(j, j)
+	runner := NewRunner(j, j)
 	if *runMapper {
-		job.runMapper(os.Stdin, os.Stdout)
+		runner.runMapper(os.Stdin, os.Stdout)
 	} else if *runReducer {
-		err := job.runReducer(os.Stdin, os.Stdout)
+		err := runner.runReducer(os.Stdin, os.Stdout)
 		if err != nil && err != io.EOF {
 			panic(err)
 		}
