@@ -5,20 +5,21 @@ import (
 	"flag"
 	"io"
 	"os"
+	"fmt"
 )
+
+var _ = fmt.Sprintln
 
 type Pair struct {
 	Key, Value interface{}
 }
 
-type ItemComparator interface {
+type Comparator interface {
 	Equals(x interface{}) bool
 }
 
 func equals(x, y interface{}) bool {
 	switch x.(type) {
-	default:
-		return x == y
 	case ItemComparator:
 		return x.(ItemComparator).Equals(y)
 	}
@@ -27,10 +28,8 @@ func equals(x, y interface{}) bool {
 
 func (p *Pair) Equals(x interface{}) bool {
 	switch x.(type) {
-	default:
-		return false
-	case Pair:
-		return equals(p.Key, x.(Pair).Key)
+	case *Pair:
+		return equals(p.Key, x.(*Pair).Key)
 	}
 	return false
 }
@@ -79,11 +78,6 @@ func (j *Runner) runMapper(in io.Reader, out io.Writer) (err error) {
 	return nil
 }
 
-type ReduceTask struct {
-	key     interface{}
-	vals    chan interface{}
-	reducer Reducer
-}
 
 func (j *Runner) runReducer(in io.Reader, out io.Writer) error {
 	pairIn := NewPairReader(in)
@@ -103,7 +97,7 @@ func (j *Runner) runReducer(in io.Reader, out io.Writer) error {
 	}()
 
 	// Keep track of the current key, assumed to be a string...
-	var last interface{}
+	var last *Pair
 	vals := make([]interface{}, 0)
 
 	for {
@@ -111,15 +105,16 @@ func (j *Runner) runReducer(in io.Reader, out io.Writer) error {
 		if err != nil {
 			return err
 		}
-		if equals(last, x) {
-			vals = append(vals, x)
+		current := x.(*Pair)
+		if last == nil || last.Equals(current) {
+			vals = append(vals, current.Value)
 
 		// If the key switched start reducing.
 		} else {
 			// Run the reducer synchronously
 			valChan := make(chan interface{})
 			go func() {
-				j.reducer.Reduce(*curKey, valChan, reducerOut)
+				j.reducer.Reduce(last.Key, valChan, reducerOut)
 			}()
 			for _, v := range vals {
 				valChan <- v
@@ -127,9 +122,9 @@ func (j *Runner) runReducer(in io.Reader, out io.Writer) error {
 			close(valChan)
 
 			vals = make([]interface{}, 0)
-			vals = append(vals, p.Value)
+			vals = append(vals, current.Value)
 		}
-		last = x
+		last = current
 	}
 	close(reducerOut)
 	return nil
