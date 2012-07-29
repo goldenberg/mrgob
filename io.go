@@ -16,7 +16,8 @@ func NewPairWriter(w io.Writer) *JSONPairWriter {
 	return &JSONPairWriter{bufio.NewWriter(w)}
 }
 
-func (w *JSONPairWriter) Write(p Pair) (err error) {
+func (w *JSONPairWriter) Write(x interface{}) (err error) {
+	p := x.(Pair)
 	key, err := json.Marshal(p.Key)
 	if err != nil {
 		return err
@@ -41,7 +42,7 @@ func NewPairReader(r io.Reader) *JSONPairReader {
 	return &JSONPairReader{bufio.NewReader(r)}
 }
 
-func (r *JSONPairReader) Read() (*Pair, error) {
+func (r *JSONPairReader) Read() (interface{}, error) {
 	line, err := r.ReadString('\n')
 	if err != nil {
 		return nil, err

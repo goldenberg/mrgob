@@ -11,12 +11,36 @@ type Pair struct {
 	Key, Value interface{}
 }
 
+type ItemComparator interface {
+	Equals(x interface{}) bool
+}
+
+func equals(x, y interface{}) bool {
+	switch x.(type) {
+	default:
+		return x == y
+	case ItemComparator:
+		return x.(ItemComparator).Equals(y)
+	}
+	return false
+}
+
+func (p *Pair) Equals(x interface{}) bool {
+	switch x.(type) {
+	default:
+		return false
+	case Pair:
+		return equals(p.Key, x.(Pair).Key)
+	}
+	return false
+}
+
 type Mapper interface {
-	Map(x interface{}, out chan Pair) error
+	Map(x interface{}, out chan interface{}) error
 }
 
 type Reducer interface {
-	Reduce(key interface{}, values chan interface{}, out chan Pair) error
+	Reduce(key interface{}, values chan interface{}, out chan interface{}) error
 }
 
 type Runner struct {
@@ -31,7 +55,7 @@ func NewRunner(m Mapper, r Reducer) *Runner {
 func (j *Runner) runMapper(in io.Reader, out io.Writer) (err error) {
 	bufIn := bufio.NewReader(in)
 	pairOut := NewPairWriter(out)
-	mapperOut := make(chan Pair)
+	mapperOut := make(chan interface{})
 
 	defer pairOut.Flush()
 	defer close(mapperOut)
@@ -63,7 +87,7 @@ type ReduceTask struct {
 
 func (j *Runner) runReducer(in io.Reader, out io.Writer) error {
 	pairIn := NewPairReader(in)
-	reducerOut := make(chan Pair)
+	reducerOut := make(chan interface{})
 
 	// Write the output
 	go func() {
@@ -83,7 +107,8 @@ func (j *Runner) runReducer(in io.Reader, out io.Writer) error {
 	vals := make([]interface{}, 0)
 
 	for {
-		p, err := pairIn.Read()
+		x, err := pairIn.Read()
+		p := x.(*Pair)
 		if err != nil {
 			return err
 		}
