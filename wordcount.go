@@ -5,8 +5,6 @@ import (
 	"unicode"
 )
 
-const ()
-
 type MRWordCount struct{}
 
 func isPunctOrSpace(r rune) bool {
@@ -16,7 +14,7 @@ func isPunctOrSpace(r rune) bool {
 func (j *MRWordCount) Map(line interface{}, out chan interface{}) error {
 	for _, word := range strings.FieldsFunc(line.(string), isPunctOrSpace) {
 		if len(word) > 0 {
-			out <- Pair{strings.ToLower(word), 1}
+			out <- &Pair{strings.ToLower(word), 1}
 		}
 	}
 	return nil
@@ -27,12 +25,12 @@ func (j *MRWordCount) Reduce(key interface{}, values chan interface{}, out chan 
 	for val := range values {
 		sum += val.(float64)
 	}
-	out <- Pair{key.(string), sum}
+	out <- &Pair{key.(string), sum}
 	return nil
 }
 
 func main() {
-	job := new(MRWordCount)
-	runner := NewRunner(job, job)
-	runner.Run()
+	wc := new(MRWordCount)
+	job := NewJob(wc, wc)
+	job.Run()
 }

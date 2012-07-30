@@ -8,6 +8,36 @@ import (
 	"strings"
 )
 
+type Writer interface {
+	Write(x interface{}) error
+	Flush() error
+}
+
+type Reader interface {
+	Read() (interface{}, error)
+}
+
+type LineReader struct {
+	*bufio.Reader
+}
+
+func (r *LineReader) Read() (interface{}, error) {
+	return r.ReadString('\n')
+}
+
+func NewLineReader(r io.Reader) *LineReader {
+	return &LineReader{bufio.NewReader(r)}
+}
+
+type PairWriter interface {
+	Write(p *Pair) error
+	Flush() error
+}
+
+type PairReader interface {
+	Read() (*Pair, error)
+}
+
 type JSONPairWriter struct {
 	*bufio.Writer
 }
@@ -16,8 +46,7 @@ func NewPairWriter(w io.Writer) *JSONPairWriter {
 	return &JSONPairWriter{bufio.NewWriter(w)}
 }
 
-func (w *JSONPairWriter) Write(x interface{}) (err error) {
-	p := x.(Pair)
+func (w *JSONPairWriter) Write(p *Pair) (err error) {
 	key, err := json.Marshal(p.Key)
 	if err != nil {
 		return err
@@ -42,7 +71,7 @@ func NewPairReader(r io.Reader) *JSONPairReader {
 	return &JSONPairReader{bufio.NewReader(r)}
 }
 
-func (r *JSONPairReader) Read() (interface{}, error) {
+func (r *JSONPairReader) Read() (*Pair, error) {
 	line, err := r.ReadString('\n')
 	if err != nil {
 		return nil, err
