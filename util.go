@@ -36,13 +36,10 @@ func GroupBy(c chan interface{}, key keyFunc) (out chan *Group) {
 		current := &Group{nil, make(chan interface{})}
 		for x := range c {
 			k := key(x)
-			logger.Println("Got", x, "grouping on", k)
 			if current.Key == nil {
-				logger.Println("Key was None. Setting to", k)
 				current.Key = k
 				out <- current
 			} else if !equals(current.Key, k) {
-				logger.Println("Keys unequal", current.Key, "!=", k)
 				close(current.Values)
 				current = &Group{k, make(chan interface{})}
 				out <- current

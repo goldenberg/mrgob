@@ -42,8 +42,9 @@ func NewJob(mapper Mapper, reducer Reducer) *Job {
 
 func (j *Job) runMapper() (err error) {
 	mapperOut := make(chan interface{})
-
 	done := make(chan bool)
+
+	// Write the map output
 	go func() {
 		for p := range mapperOut {
 			err := j.MapWriter.Write(p.(*Pair))
@@ -68,13 +69,21 @@ func (j *Job) runMapper() (err error) {
 }
 
 func (j *Job) runReducer() error {
-	reducerOut := make(chan interface{})
 	reducerIn := make(chan interface{})
+	reducerOut := make(chan interface{})
 	done := make(chan bool)
 
-	// Write the output
+	// Iterate over the groups, executing Reduce() synchronously.
+	// Someday this can be changed to have multiple workers.
 	go func() {
-		logger.Println("starting reduce output goroutine")
+		for group := range GroupBy(reducerIn, pairKey) {
+			j.Reduce.Reduce(group.Key, group.Values, reducerOut)
+		}
+		close(reducerOut)
+	}()
+
+	// Write the output from the tasks
+	go func() {
 		defer j.ReduceWriter.Flush()
 
 		for p := range reducerOut {
@@ -86,59 +95,16 @@ func (j *Job) runReducer() error {
 		done <- true
 	}()
 
-	go func() {
-		logger.Println("starting reduce goroutine")
-		for group := range GroupBy(reducerIn, pairKey) {
-			logger.Println("Got group", group)
-			j.Reduce.Reduce(group.Key, group.Values, reducerOut)
-		}
-		close(reducerOut)
-	}()
-
 	// Read into the reducers
 	for {
 		current, err := j.ReduceReader.Read()
-		logger.Println("Read", current)
 		if err != nil {
 			close(reducerIn)
 			break
 		}
 		reducerIn <- current
 	}
-	logger.Println("Waiting for done")
 	<-done
-	return nil
-	// // Keep track of the current key, assumed to be a string...
-	// var last *Pair
-	// vals := make([]interface{}, 0)
-
-	// for {
-	// 	current, err := j.ReduceReader.Read()
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	if last == nil || last.Equals(current) {
-	// 		fmt.Println("last", last, "current", current)
-	// 		vals = append(vals, current.Value)
-
-	// 		// If the key switched start reducing.
-	// 	} else {
-	// 		// Run the reducer synchronously
-	// 		valChan := make(chan interface{})
-	// 		go func() {
-	// 			j.Reduce.Reduce(last.Key, valChan, reducerOut)
-	// 		}()
-	// 		for _, v := range vals {
-	// 			valChan <- v
-	// 		}
-	// 		close(valChan)
-
-	// 		vals = make([]interface{}, 0)
-	// 		vals = append(vals, current.Value)
-	// 	}
-	// 	last = current
-	// }
-	close(reducerOut)
 	return nil
 }
 
