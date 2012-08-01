@@ -1,42 +1,16 @@
 package main
 
 import (
-"log"
 	"flag"
 	"fmt"
 	"io"
+	"log"
 	"os"
 )
 
 var _ = fmt.Sprintln
 
 var logger = log.New(os.Stderr, "", 0)
-
-type Pair struct {
-	Key, Value interface{}
-}
-
-type Comparator interface {
-	Equals(x interface{}) bool
-}
-
-func equals(x, y interface{}) bool {
-	switch x.(type) {
-	case Comparator:
-		return x.(Comparator).Equals(y)
-	}
-	return false
-}
-
-func (p *Pair) Equals(x interface{}) bool {
-	switch x.(type) {
-	case *Pair:
-		return equals(p.Key, x.(*Pair).Key)
-	case Pair:
-		return equals(p.Key, x.(Pair).Key)
-	}
-	return false
-}
 
 type Mapper interface {
 	Map(x interface{}, out chan interface{}) error
@@ -95,9 +69,12 @@ func (j *Job) runMapper() (err error) {
 
 func (j *Job) runReducer() error {
 	reducerOut := make(chan interface{})
+	reducerIn := make(chan interface{})
+	done := make(chan bool)
 
 	// Write the output
 	go func() {
+		logger.Println("starting reduce output goroutine")
 		defer j.ReduceWriter.Flush()
 
 		for p := range reducerOut {
@@ -106,42 +83,64 @@ func (j *Job) runReducer() error {
 				return
 			}
 		}
+		done <- true
 	}()
 
-	// Keep track of the current key, assumed to be a string...
-	var last *Pair
-	vals := make([]interface{}, 0)
+	go func() {
+		logger.Println("starting reduce goroutine")
+		for group := range GroupBy(reducerIn, pairKey) {
+			logger.Println("Got group", group)
+			j.Reduce.Reduce(group.Key, group.Values, reducerOut)
+		}
+		close(reducerOut)
+	}()
 
+	// Read into the reducers
 	for {
 		current, err := j.ReduceReader.Read()
+		logger.Println("Read", current)
 		if err != nil {
-			return err
+			close(reducerIn)
+			break
 		}
-		if last == nil || last.Equals(current) {
-			fmt.Println("last", last, "current", current)
-			vals = append(vals, current.Value)
-
-			// If the key switched start reducing.
-		} else {
-			// Run the reducer synchronously
-			valChan := make(chan interface{})
-			go func() {
-				j.Reduce.Reduce(last.Key, valChan, reducerOut)
-			}()
-			for _, v := range vals {
-				valChan <- v
-			}
-			close(valChan)
-
-			vals = make([]interface{}, 0)
-			vals = append(vals, current.Value)
-		}
-		last = current
+		reducerIn <- current
 	}
+	logger.Println("Waiting for done")
+	<-done
+	return nil
+	// // Keep track of the current key, assumed to be a string...
+	// var last *Pair
+	// vals := make([]interface{}, 0)
+
+	// for {
+	// 	current, err := j.ReduceReader.Read()
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	if last == nil || last.Equals(current) {
+	// 		fmt.Println("last", last, "current", current)
+	// 		vals = append(vals, current.Value)
+
+	// 		// If the key switched start reducing.
+	// 	} else {
+	// 		// Run the reducer synchronously
+	// 		valChan := make(chan interface{})
+	// 		go func() {
+	// 			j.Reduce.Reduce(last.Key, valChan, reducerOut)
+	// 		}()
+	// 		for _, v := range vals {
+	// 			valChan <- v
+	// 		}
+	// 		close(valChan)
+
+	// 		vals = make([]interface{}, 0)
+	// 		vals = append(vals, current.Value)
+	// 	}
+	// 	last = current
+	// }
 	close(reducerOut)
 	return nil
 }
-
 
 func (r *Job) Run() {
 	var runMapper = flag.Bool("mapper", false, "Run the mapper")

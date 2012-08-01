@@ -23,7 +23,7 @@ func (j *MRWordCount) Map(line interface{}, out chan interface{}) error {
 func (j *MRWordCount) Reduce(key interface{}, values chan interface{}, out chan interface{}) error {
 	sum := 0.
 	for val := range values {
-		sum += val.(float64)
+		sum += val.(*Pair).Value.(float64)
 	}
 	out <- &Pair{key.(string), sum}
 	return nil
