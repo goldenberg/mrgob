@@ -1,6 +1,7 @@
 package main
 
 import (
+"log"
 	"flag"
 	"fmt"
 	"io"
@@ -8,6 +9,8 @@ import (
 )
 
 var _ = fmt.Sprintln
+
+var logger = log.New(os.Stderr, "", 0)
 
 type Pair struct {
 	Key, Value interface{}
@@ -62,10 +65,11 @@ func NewJob(mapper Mapper, reducer Reducer) *Job {
 		ReduceWriter: NewPairWriter(os.Stdout),
 	}
 }
+
 func (j *Job) runMapper() (err error) {
 	mapperOut := make(chan interface{})
-	defer close(mapperOut)
 
+	done := make(chan bool)
 	go func() {
 		for p := range mapperOut {
 			err := j.MapWriter.Write(p.(*Pair))
@@ -74,15 +78,18 @@ func (j *Job) runMapper() (err error) {
 			}
 		}
 		j.MapWriter.Flush()
+		done <- true
 	}()
 
 	for {
 		x, err := j.MapReader.Read()
-		if err != nil {
-			return err
+		if err != nil || x == nil {
+			close(mapperOut)
+			break
 		}
 		j.Map.Map(x, mapperOut)
 	}
+	<-done
 	return nil
 }
 
@@ -135,17 +142,7 @@ func (j *Job) runReducer() error {
 	return nil
 }
 
-func groupBy(c chan interface{}, key func(x, y interface{}) bool) (out chan chan interface{}) {
-	out = make(chan chan interface{})
-	var last interface{}
 
-	for x := range c {
-		if last == nil {
-			last = x
-			continue
-		}
-	}	
-} 
 func (r *Job) Run() {
 	var runMapper = flag.Bool("mapper", false, "Run the mapper")
 	var runReducer = flag.Bool("reducer", false, "Run the mapper")
@@ -159,4 +156,5 @@ func (r *Job) Run() {
 			panic(err)
 		}
 	}
+	return
 }
