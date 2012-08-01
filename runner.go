@@ -1,11 +1,12 @@
 package main
 
 import (
-flag "github.com/ogier/pflag"
+	flag "github.com/ogier/pflag"
 	"fmt"
 	"io"
 	"log"
 	"os"
+	"encoding/json"
 )
 
 var _ = fmt.Sprintln
@@ -108,18 +109,53 @@ func (j *Job) runReducer() error {
 	return nil
 }
 
-func (r *Job) Run() {
+func (j *Job) printSteps() error {
+	steps := make([]map[string]interface{}, 0)
+
+	step := map[string]interface{} {
+		"type":"streaming",
+		"mapper": map[string]string {
+			"type" : "script",
+			"pre_filter": "cat",
+		},
+		"reducer": map[string]string {
+			"type" : "script",
+			"pre_filter": "cat",
+		},
+	}
+
+
+	steps = append(steps, step)
+
+	b, err := json.Marshal(steps)
+	if err != nil {
+		return err
+	}
+	os.Stdout.Write(b)
+	os.Stdout.WriteString("\n")
+	return nil
+}
+
+func (j *Job) Run() {
 	var runMapper = flag.Bool("mapper", false, "Run the mapper")
 	var runReducer = flag.Bool("reducer", false, "Run the mapper")
+	var printSteps = flag.Bool("steps", false, "Print step descriptions")
+
+	// Just to make mrjob happy
+	var stepNum = flag.Int("step-num", 0, "Step number")
+	var _ = stepNum
+
 	flag.Parse()
 
 	if *runMapper {
-		r.runMapper()
+		j.runMapper()
 	} else if *runReducer {
-		err := r.runReducer()
+		err := j.runReducer()
 		if err != nil && err != io.EOF {
 			panic(err)
 		}
+	} else if *printSteps {
+		j.printSteps()
 	}
 	return
 }
