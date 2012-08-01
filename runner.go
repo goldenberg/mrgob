@@ -1,12 +1,12 @@
 package main
 
 import (
-	flag "github.com/ogier/pflag"
+	"encoding/json"
 	"fmt"
+	flag "github.com/ogier/pflag"
 	"io"
 	"log"
 	"os"
-	"encoding/json"
 )
 
 var _ = fmt.Sprintln
@@ -112,18 +112,17 @@ func (j *Job) runReducer() error {
 func (j *Job) printSteps() error {
 	steps := make([]map[string]interface{}, 0)
 
-	step := map[string]interface{} {
-		"type":"streaming",
-		"mapper": map[string]string {
-			"type" : "script",
+	step := map[string]interface{}{
+		"type": "streaming",
+		"mapper": map[string]string{
+			"type":       "script",
 			"pre_filter": "cat",
 		},
-		"reducer": map[string]string {
-			"type" : "script",
+		"reducer": map[string]string{
+			"type":       "script",
 			"pre_filter": "cat",
 		},
 	}
-
 
 	steps = append(steps, step)
 
