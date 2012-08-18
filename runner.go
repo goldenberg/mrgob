@@ -9,8 +9,8 @@ import (
 	"os"
 )
 
-var _ = fmt.Sprintln
 
+ var _ = fmt.Sprintln
 var logger = log.New(os.Stderr, "", 0)
 
 type Mapper interface {
@@ -21,7 +21,7 @@ type Reducer interface {
 	Reduce(key interface{}, values chan interface{}, out chan interface{}) error
 }
 
-type Job struct {
+type Step struct {
 	Map          Mapper
 	Reduce       Reducer
 	MapReader    Reader
@@ -30,8 +30,31 @@ type Job struct {
 	ReduceWriter PairWriter
 }
 
-func NewJob(mapper Mapper, reducer Reducer) *Job {
-	return &Job{
+type Job struct {
+	Steps []Step
+}
+
+func NewJob(steps ...Step) *Job {
+	return &Job{steps}
+}
+
+func (j *Job) printSteps() (err error) {
+	descriptions := make([]map[string]interface{}, 0)
+	for _, step := range j.Steps {
+		descriptions = append(descriptions, step.describe())
+	}
+
+	b, err := json.Marshal(descriptions)
+	if err != nil {
+	       return err
+	}
+	os.Stdout.Write(b)
+	os.Stdout.WriteString("\n")
+	return nil
+}
+
+func NewStep(mapper Mapper, reducer Reducer) *Step {
+	return &Step{
 		Map:          mapper,
 		Reduce:       reducer,
 		MapReader:    NewLineReader(os.Stdin),
@@ -41,7 +64,7 @@ func NewJob(mapper Mapper, reducer Reducer) *Job {
 	}
 }
 
-func (j *Job) runMapper() (err error) {
+func (j *Step) runMapper() (err error) {
 	mapperOut := make(chan interface{})
 	done := make(chan bool)
 
@@ -69,7 +92,7 @@ func (j *Job) runMapper() (err error) {
 	return nil
 }
 
-func (j *Job) runReducer() error {
+func (j *Step) runReducer() error {
 	reducerIn := make(chan interface{})
 	reducerOut := make(chan interface{})
 	done := make(chan bool)
@@ -109,10 +132,8 @@ func (j *Job) runReducer() error {
 	return nil
 }
 
-func (j *Job) printSteps() error {
-	steps := make([]map[string]interface{}, 0)
-
-	step := map[string]interface{}{
+func (j *Step) describe() map[string]interface{} {
+	return map[string]interface{}{
 		"type": "streaming",
 		"mapper": map[string]string{
 			"type":       "script",
@@ -123,16 +144,6 @@ func (j *Job) printSteps() error {
 			"pre_filter": "cat",
 		},
 	}
-
-	steps = append(steps, step)
-
-	b, err := json.Marshal(steps)
-	if err != nil {
-		return err
-	}
-	os.Stdout.Write(b)
-	os.Stdout.WriteString("\n")
-	return nil
 }
 
 func (j *Job) Run() {
@@ -140,16 +151,14 @@ func (j *Job) Run() {
 	var runReducer = flag.Bool("reducer", false, "Run the mapper")
 	var printSteps = flag.Bool("steps", false, "Print step descriptions")
 
-	// Just to make mrjob happy
-	var stepNum = flag.Int("step-num", 0, "Step number")
-	var _ = stepNum
+	var stepNum = flag.Uint("step-num", 0, "Step number")
 
 	flag.Parse()
 
 	if *runMapper {
-		j.runMapper()
+		j.Steps[*stepNum].runMapper()
 	} else if *runReducer {
-		err := j.runReducer()
+		err := j.Steps[*stepNum].runReducer()
 		if err != nil && err != io.EOF {
 			panic(err)
 		}

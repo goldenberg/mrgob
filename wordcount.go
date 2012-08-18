@@ -31,6 +31,6 @@ func (j *MRWordCount) Reduce(key interface{}, values chan interface{}, out chan 
 
 func main() {
 	wc := new(MRWordCount)
-	job := NewJob(wc, wc)
+	job := NewJob(*NewStep(wc, wc))
 	job.Run()
 }
