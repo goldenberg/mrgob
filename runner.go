@@ -133,17 +133,23 @@ func (j *Step) runReducer() error {
 }
 
 func (j *Step) describe() map[string]interface{} {
-	return map[string]interface{}{
-		"type": "streaming",
-		"mapper": map[string]string{
+	out := make(map[string]interface{}, 0)
+
+	out["type"] = "streaming"
+
+	if j.Map != nil {
+		out["mapper"] = map[string]string{
 			"type":       "script",
 			"pre_filter": "cat",
-		},
-		"reducer": map[string]string{
-			"type":       "script",
-			"pre_filter": "cat",
-		},
+		}
 	}
+	if j.Reduce != nil {
+		out["reducer"] = map[string]string{
+			"type":       "script",
+			"pre_filter": "cat",
+		}
+	}
+	return out
 }
 
 func (j *Job) Run() {
