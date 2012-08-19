@@ -20,10 +20,6 @@ func (j *MRWordCount) Map(line interface{}, out chan interface{}) error {
 	return nil
 }
 
-func (j *MRWordCount) Combine(key interface{}, values chan interface{}, out chan interface{}) error { 
-	return Reduce(key, values, out)
-}
-
 func (j *MRWordCount) Reduce(key interface{}, values chan interface{}, out chan interface{}) error {
 	sum := 0.
 	for val := range values {
