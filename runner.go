@@ -27,23 +27,32 @@ type Reducer interface {
 	Reduce(key interface{}, values chan interface{}, out chan interface{}) error
 }
 
+// Step represents a single Map and Reduce step.
 type Step struct {
+	// The value implementing the Mapper function.
 	Map          Mapper
+	// The value implementing the Reducer function.
 	Reduce       Reducer
+	// MapReader reads input and provides the values passed to the Mapper.
 	MapReader    Reader
+	// MapWriter writes the output pairs of each map call.
 	MapWriter    PairWriter
+	// ReduceReader reads the Pair
 	ReduceReader PairReader
 	ReduceWriter PairWriter
 }
 
+// Job is a set of Steps to be executed in sequence.
 type Job struct {
 	Steps []Step
 }
 
+// NewJob creates a Job from 1 or more Steps.
 func NewJob(steps ...Step) *Job {
 	return &Job{steps}
 }
 
+// printSteps prints the step descriptions in accordance with XXX. TODO.
 func (j *Job) printSteps() (err error) {
 	descriptions := make([]map[string]interface{}, 0)
 	for _, step := range j.Steps {
@@ -77,6 +86,7 @@ func (j *Step) runMapper() (err error) {
 	// Write the map output
 	go func() {
 		for p := range mapperOut {
+			// BUG(benjamin) We should be able to support map output other than pairs.
 			err := j.MapWriter.Write(p.(*Pair))
 			if err != nil {
 				return
@@ -86,6 +96,8 @@ func (j *Step) runMapper() (err error) {
 		done <- true
 	}()
 
+	// Iterate over the MapReader, calling the Map function on each item. This
+	// could be parallelized across multiple goroutine workers in the future.
 	for {
 		x, err := j.MapReader.Read()
 		if err != nil || x == nil {
@@ -112,7 +124,7 @@ func (j *Step) runReducer() error {
 		close(reducerOut)
 	}()
 
-	// Write the output from the tasks
+	// Write the output from the tasks as its produced.
 	go func() {
 		defer j.ReduceWriter.Flush()
 
@@ -138,6 +150,7 @@ func (j *Step) runReducer() error {
 	return nil
 }
 
+// describe returns the JSON description of the MapReduce step.
 func (j *Step) describe() map[string]interface{} {
 	out := make(map[string]interface{}, 0)
 
@@ -146,6 +159,9 @@ func (j *Step) describe() map[string]interface{} {
 	if j.Map != nil {
 		out["mapper"] = map[string]string{
 			"type":       "script",
+			// TODO: this is a slightly stupid hack so that we don't have to
+			// parse filenames from the arguments and can just read from
+			// stdin.
 			"pre_filter": "cat",
 		}
 	}
@@ -158,11 +174,11 @@ func (j *Step) describe() map[string]interface{} {
 	return out
 }
 
+// Run parses the command line options in accordance with TODO(url) and runs the appropriate steps.
 func (j *Job) Run() {
 	var runMapper = flag.Bool("mapper", false, "Run the mapper")
 	var runReducer = flag.Bool("reducer", false, "Run the mapper")
 	var printSteps = flag.Bool("steps", false, "Print step descriptions")
-
 	var stepNum = flag.Uint("step-num", 0, "Step number")
 
 	flag.Parse()
