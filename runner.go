@@ -9,14 +9,20 @@ import (
 	"os"
 )
 
-
- var _ = fmt.Sprintln
+var _ = fmt.Sprintln
 var logger = log.New(os.Stderr, "", 0)
 
+// Mapper is the interface any type that "maps" must implement. Typical values
+// of x are individual lines deserialized from input files.
 type Mapper interface {
 	Map(x interface{}, out chan interface{}) error
 }
 
+type Combiner interface {
+	Combine(key interface{}, values chan interface{}, out chan interface{}) error
+}
+
+// Reducer is the interface any type that "reduces"
 type Reducer interface {
 	Reduce(key interface{}, values chan interface{}, out chan interface{}) error
 }
@@ -46,7 +52,7 @@ func (j *Job) printSteps() (err error) {
 
 	b, err := json.Marshal(descriptions)
 	if err != nil {
-	       return err
+		return err
 	}
 	os.Stdout.Write(b)
 	os.Stdout.WriteString("\n")
