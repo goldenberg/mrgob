@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	// Use pflag instead of flag to have consistent --flags with mrjob.
 	flag "github.com/ogier/pflag"
 	"io"
 	"log"
