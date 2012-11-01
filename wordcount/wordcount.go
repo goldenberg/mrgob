@@ -3,6 +3,7 @@ package main
 import (
 	"strings"
 	"unicode"
+	mrjob "mrgob/mrjob"
 )
 
 type MRWordCount struct{}
@@ -14,7 +15,7 @@ func isPunctOrSpace(r rune) bool {
 func (j *MRWordCount) Map(line interface{}, out chan interface{}) error {
 	for _, word := range strings.FieldsFunc(line.(string), isPunctOrSpace) {
 		if len(word) > 0 {
-			out <- &Pair{strings.ToLower(word), 1}
+			out <- &mrjob.Pair{strings.ToLower(word), 1}
 		}
 	}
 	return nil
@@ -23,14 +24,14 @@ func (j *MRWordCount) Map(line interface{}, out chan interface{}) error {
 func (j *MRWordCount) Reduce(key interface{}, values chan interface{}, out chan interface{}) error {
 	sum := 0.
 	for val := range values {
-		sum += val.(*Pair).Value.(float64)
+		sum += val.(*mrjob.Pair).Value.(float64)
 	}
-	out <- &Pair{key.(string), sum}
+	out <- &mrjob.Pair{key.(string), sum}
 	return nil
 }
 
 func main() {
 	wc := new(MRWordCount)
-	job := NewJob(*NewStep(wc, wc))
+	job := mrjob.NewJob(*mrjob.NewStep(wc, wc))
 	job.Run()
 }
